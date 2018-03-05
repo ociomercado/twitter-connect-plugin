@@ -49,21 +49,8 @@
 {
 	TWTRAPIClient *apiClient = [[Twitter sharedInstance] APIClient];
 
-	NSMutableDictionary *requestParameters = [[NSMutableDictionary alloc] init];
-    [requestParameters setObject:[[[Twitter sharedInstance] session] userId] forKey:@"user_id"];
-    
-    NSString *include_entities = @"false";
-    
-    if([[command.arguments objectAtIndex:0] objectForKey:@"include_entities"] != nil) {
-        if([[[command.arguments objectAtIndex:0] objectForKey:@"include_entities"] boolValue] == YES) {
-            include_entities = @"true";
-        }
-    }
-    
-    [requestParameters setObject:include_entities forKey:@"include_entities"];
-
+	NSDictionary *requestParameters = [NSDictionary dictionaryWithObjectsAndKeys:[[[Twitter sharedInstance] session] userName], @"screen_name", nil];
 	NSError *error = nil;
-
 	NSURLRequest *apiRequest = [apiClient URLRequestWithMethod:@"GET"
 														   URL:@"https://api.twitter.com/1.1/users/show.json"
 													parameters:requestParameters
@@ -84,60 +71,6 @@
 						   [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 
 					   }];
-}
-
-- (void)verifyCredentials:(CDVInvokedUrlCommand*)command
-{
-    TWTRAPIClient *apiClient = [[Twitter sharedInstance] APIClient];
-    
-    NSMutableDictionary *requestParameters = [[NSMutableDictionary alloc] init];
-    
-    NSString *include_entities = @"false";
-    NSString *skip_status = @"true";
-    NSString *include_email = @"true";
-    
-    if([[command.arguments objectAtIndex:0] objectForKey:@"include_entities"] != nil) {
-        if([[[command.arguments objectAtIndex:0] objectForKey:@"include_entities"] boolValue] == YES) {
-            include_entities = @"true";
-        }
-    }
-    if([[command.arguments objectAtIndex:0] objectForKey:@"skip_status"] != nil) {
-        if([[[command.arguments objectAtIndex:0] objectForKey:@"skip_status"] boolValue] == NO) {
-            skip_status = @"false";
-        }
-    }
-    if([[command.arguments objectAtIndex:0] objectForKey:@"include_email"] != nil) {
-        if([[[command.arguments objectAtIndex:0] objectForKey:@"include_email"] boolValue] == NO) {
-            include_email = @"false";
-        }
-    }
-    
-    [requestParameters setObject:include_entities forKey:@"include_entities"];
-    [requestParameters setObject:skip_status forKey:@"skip_status"];
-    [requestParameters setObject:include_email forKey:@"include_email"];
-    
-    NSError *error = nil;
-    
-    NSURLRequest *apiRequest = [apiClient URLRequestWithMethod:@"GET"
-                                                           URL:@"https://api.twitter.com/1.1/account/verify_credentials.json"
-                                                    parameters:requestParameters
-                                                         error:&error];
-    [apiClient sendTwitterRequest:apiRequest
-                       completion:^(NSURLResponse *response, NSData *data, NSError *error) {
-                           NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
-                           NSInteger _httpStatus = [httpResponse statusCode];
-                           
-                           CDVPluginResult *pluginResult = nil;
-                           NSLog(@"API Response :%@",response);
-                           if (error != nil) {
-                               pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:[error localizedDescription]];
-                           } else if (_httpStatus == 200) {
-                               NSDictionary *resultDict = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
-                               pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:resultDict];
-                           }
-                           [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-                           
-                       }];
 }
 
 - (void)openComposer:(CDVInvokedUrlCommand*)command

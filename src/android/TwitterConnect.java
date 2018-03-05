@@ -1,31 +1,32 @@
 package com.manifestwebdesign.twitterconnect;
 
-import io.fabric.sdk.android.Fabric;
+import android.app.Activity;
+import android.util.Log;
 
+import com.twitter.sdk.android.core.*;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.content.Context;
 import android.content.Intent;
-import android.app.Activity;
-import android.util.Log;
 
-import com.twitter.sdk.android.core.*;
 import com.twitter.sdk.android.Twitter;
 import com.twitter.sdk.android.core.identity.TwitterLoginButton;
-import com.twitter.sdk.android.tweetcomposer.TweetComposer;
-import com.twitter.sdk.android.tweetui.UserTimeline;
 
+import io.fabric.sdk.android.Fabric;
 import retrofit.client.Response;
+import retrofit.http.GET;
 import retrofit.http.POST;
 import retrofit.http.Query;
 import retrofit.mime.TypedByteArray;
+
+import com.twitter.sdk.android.tweetcomposer.TweetComposer;
+import com.twitter.sdk.android.tweetui.UserTimeline;
 
 public class TwitterConnect extends CordovaPlugin {
 
@@ -62,48 +63,7 @@ public class TwitterConnect extends CordovaPlugin {
 			return true;
 		}
 		if (action.equals("showUser")) {
-			boolean includeEntities = false;
-			String includeEntitiesStr = "";
-
-			try {
-				includeEntitiesStr = args.getJSONObject(0).getString("include_entities");
-				includeEntities = Boolean.valueOf(includeEntitiesStr);
-			} catch(JSONException e) {
-				//empty since has default value if error occurs
-			}
-			showUser(includeEntities, callbackContext);
-			return true;
-		}
-		if (action.equals("verifyCredentials")) {
-			boolean includeEntities = false;
-			boolean skipStatus = true;
-			boolean includeEmail = true;
-			String includeEntitiesStr = "";
-			String skipStatusStr = "";
-			String includeEmailStr = "";
-
-			try {
-				includeEntitiesStr = args.getJSONObject(0).getString("include_entities");
-				includeEntities = Boolean.valueOf(includeEntitiesStr);
-			} catch(JSONException e) {
-				//empty since has default value if error occurs
-			}
-
-			try {
-				skipStatusStr = args.getJSONObject(0).getString("skip_status");
-				skipStatus = Boolean.valueOf(skipStatusStr);
-			} catch(JSONException e) {
-				//empty since has default value if error occurs
-			}
-
-			try {
-				includeEmailStr = args.getJSONObject(0).getString("include_email");
-				includeEmail = Boolean.valueOf(includeEmailStr);
-			} catch(JSONException e) {
-				//empty since has default value if error occurs
-			}
-
-			verifyCredentials(includeEntities, skipStatus, includeEmail, callbackContext);
+			showUser(callbackContext);
 			return true;
 		}
 		if (action.equals("sendTweet")) {
@@ -164,15 +124,32 @@ public class TwitterConnect extends CordovaPlugin {
 		});
 	}
 
-	private void showUser(final boolean includeEntities, final CallbackContext callbackContext) {
+	/**
+	 * Extends TwitterApiClient adding our additional endpoints
+	 * via the custom 'UserService'
+	 */
+	class UserServiceApi extends TwitterApiClient {
+		public UserServiceApi(TwitterSession session) {
+			super(session);
+		}
+
+		public UserService getCustomService() {
+			return getService(UserService.class);
+		}
+	}
+
+	interface UserService {
+		@GET("/1.1/users/show.json")
+		void show(@Query("screen_name") String screen_name, Callback<Response> cb);
+	}
+
+	private void showUser(final CallbackContext callbackContext) {
 		cordova.getThreadPool().execute(new Runnable() {
 			@Override
 			public void run() {
-				UserShowServiceApi twitterApiClient = new UserShowServiceApi(Twitter.getSessionManager().getActiveSession());
-				UserShowService userShowService = twitterApiClient.getCustomService();
-				userShowService.show(Twitter.getSessionManager().getActiveSession().getUserName(),
-									includeEntities,
-									new Callback<Response>() {
+				UserServiceApi twitterApiClient = new UserServiceApi(Twitter.getSessionManager().getActiveSession());
+				UserService userService = twitterApiClient.getCustomService();
+				userService.show(Twitter.getSessionManager().getActiveSession().getUserName(), new Callback<Response>() {
 					@Override
 					public void success(Result<Response> result) {
 						try {
@@ -184,37 +161,6 @@ public class TwitterConnect extends CordovaPlugin {
 					@Override
 					public void failure(TwitterException exception) {
 						Log.v(LOG_TAG, "Twitter API Failed "+exception.getLocalizedMessage());
-						callbackContext.error(exception.getLocalizedMessage());
-					}
-				});
-			}
-		});
-	}
-
-	private void verifyCredentials(final boolean includeEntities,
-								   final boolean skipStatus,
-								   final boolean includeEmail,
-								   final CallbackContext callbackContext) {
-		cordova.getThreadPool().execute(new Runnable() {
-			@Override
-			public void run() {
-				VerifyCredentialsServiceApi twitterApiClient = new VerifyCredentialsServiceApi(Twitter.getSessionManager().getActiveSession());
-				VerifyCredentialsService credentialsService = twitterApiClient.getCustomService();
-				credentialsService.verify(includeEntities,
-										skipStatus,
-										includeEmail,
-										new Callback<Response>() {
-					@Override
-					public void success(Result<Response> result) {
-						try {
-							callbackContext.success(new JSONObject(new String(((TypedByteArray) result.response.getBody()).getBytes())));
-						} catch (JSONException e) {
-							e.printStackTrace();
-						}
-					}
-					@Override
-					public void failure(TwitterException exception) {
-						Log.v(LOG_TAG, "VerifyCredentials API call failed.");
 						callbackContext.error(exception.getLocalizedMessage());
 					}
 				});
